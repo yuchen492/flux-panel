@@ -130,7 +130,12 @@ public class DailyReportTask {
         try {
             var r = viteConfigService.getConfigByName(key);
             if (r != null && r.getData() != null) {
-                return r.getData().toString().trim();
+                Object data = r.getData();
+                if (data instanceof com.admin.entity.ViteConfig) {
+                    String val = ((com.admin.entity.ViteConfig) data).getValue();
+                    return val != null ? val.trim() : defaultVal;
+                }
+                return data.toString().trim();
             }
         } catch (Exception ignored) {}
         return defaultVal;

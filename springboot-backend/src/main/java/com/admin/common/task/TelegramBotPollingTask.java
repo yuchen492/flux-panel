@@ -1,6 +1,11 @@
 package com.admin.common.task;
 
 import com.admin.entity.Node;
+import com.admin.entity.Forward;
+import com.admin.entity.Tunnel;
+import com.admin.service.ForwardService;
+import com.admin.service.TunnelService;
+
 import com.admin.entity.User;
 import com.admin.service.NodeService;
 import com.admin.service.UserService;
@@ -47,6 +52,12 @@ public class TelegramBotPollingTask {
 
     @Resource
     private NodeService nodeService;
+    @Resource
+    private ForwardService forwardService;
+
+    @Resource
+    private TunnelService tunnelService;
+
 
     @Resource
     private DailyReportTask dailyReportTask;
@@ -56,6 +67,7 @@ public class TelegramBotPollingTask {
 
     private long lastUpdateId = 0;
     private boolean isPolling = false;
+    private boolean commandsRegistered = false;
 
     // 每 2 秒轮询一次 Telegram updates
     @Scheduled(fixedDelay = 2000)
@@ -71,6 +83,11 @@ public class TelegramBotPollingTask {
         }
 
         isPolling = true;
+        if (!commandsRegistered) {
+            registerBotMenuCommands(botToken);
+            commandsRegistered = true;
+        }
+
         try {
             String url = "https://api.telegram.org/bot" + botToken + "/getUpdates?offset=" + (lastUpdateId + 1) + "&timeout=1";
             ResponseEntity<String> response = restTemplate.getForEntity(url, String.class);
@@ -134,7 +151,6 @@ public class TelegramBotPollingTask {
                 sendNodesSummary(botToken, chatId, false, 0);
             } else if (text.startsWith("/daily") || "晚报".equals(text)) {
                 dailyReportTask.sendDailySummaryReport();
-                sendTelegramHtml(botToken, chatId, "⚡ <b>已即时触发并推送每日流量晚报汇总！</b>");
             } else {
                 sendMainMenu(botToken, chatId);
             }
@@ -268,36 +284,99 @@ public class TelegramBotPollingTask {
         }
     }
 
-    private void sendNodesSummary(String botToken, String chatId, boolean isEdit, int messageId) {
+        private void sendNodesSummary(String botToken, String chatId, boolean isEdit, int messageId) {
         try {
             List<Node> nodeList = nodeService.list();
-            StringBuilder sb = new StringBuilder();
-            sb.append("🌐 <b>转发节点在线状态</b>\n--------------------\n");
+            List<Tunnel> tunnelList = tunnelService != null ? tunnelService.list() : null;
+            List<Forward> forwardList = forwardService != null ? forwardService.list() : null;
 
+            StringBuilder sb = new StringBuilder();
+            sb.append("🌐 <b>Flux-Panel 全景节点与转发状态</b>\n");
+            sb.append("--------------------\n");
+
+            // 1. 物理转发节点
             int onlineCount = 0;
+            sb.append("<b>【物理节点】</b>\n");
             if (nodeList != null && !nodeList.isEmpty()) {
                 for (Node n : nodeList) {
                     boolean isUp = (n.getStatus() != null && n.getStatus() == 1);
                     if (isUp) onlineCount++;
                     sb.append(isUp ? "🟢 " : "🔴 ")
                       .append("<b>").append(n.getName()).append("</b>")
-                      .append(" (").append(n.getIp() != null ? n.getIp() : "未知地址").append(")\n");
+                      .append(" (").append(n.getIp() != null ? n.getIp() : "未知IP").append(")\n");
                 }
-                sb.append("--------------------\n");
-                sb.append("统计: 共 ").append(nodeList.size()).append(" 个节点，在线 ").append(onlineCount).append(" 个\n");
+                sb.append(String.format("<i>节点在线: %d / %d 台</i>\n", onlineCount, nodeList.size()));
             } else {
-                sb.append("暂无接入的转发节点\n");
+                sb.append("暂无接入节点\n");
             }
+
+            sb.append("--------------------\n");
+
+            // 2. 隧道概况
+            sb.append("<b>【转发隧道】</b>: ");
+            if (tunnelList != null && !tunnelList.isEmpty()) {
+                sb.append(tunnelList.size()).append(" 条运行中\n");
+                for (Tunnel t : tunnelList) {
+                    sb.append(" • ").append(t.getName())
+                      .append(" (入口: ").append(t.getInIp() != null ? t.getInIp() : "内置")
+                      .append(" -> 出口: ").append(t.getOutIp() != null ? t.getOutIp() : "内置").append(")\n");
+                }
+            } else {
+                sb.append("暂无隧道\n");
+            }
+
+            sb.append("--------------------\n");
+
+            // 3. 所有用户的端口转发明细（重点：报所有的转发！）
+            sb.append("<b>【全部用户端口转发】</b>\n");
+            if (forwardList != null && !forwardList.isEmpty()) {
+                int fwdRunning = 0;
+                for (Forward f : forwardList) {
+                    boolean isFwdUp = (f.getStatus() != null && f.getStatus() == 1);
+                    if (isFwdUp) fwdRunning++;
+                    sb.append(isFwdUp ? "🟢 " : "⚪ ")
+                      .append("<b>[").append(f.getUserName() != null ? f.getUserName() : "用户" + f.getUserId()).append("]</b> ")
+                      .append(f.getName()).append(" | 端口: <code>").append(f.getInPort()).append("</code>")
+                      .append(" -> <code>").append(f.getRemoteAddr() != null ? f.getRemoteAddr() : "未设目标").append("</code>\n");
+                }
+                sb.append(String.format("<i>运行状态: %d / %d 个转发就绪</i>\n", fwdRunning, forwardList.size()));
+            } else {
+                sb.append("暂无生效的转发规则\n");
+            }
+
+            sb.append("--------------------\n");
+            sb.append("<i>更新时间: ").append(LocalDateTime.now().format(DateTimeFormatter.ofPattern("HH:mm:ss"))).append("</i>");
 
             List<List<Map<String, String>>> keyboard = new ArrayList<>();
             keyboard.add(List.of(
-                    Map.of("text", "🔄 刷新节点", "callback_data", "action_nodes"),
+                    Map.of("text", "🔄 刷新状态", "callback_data", "action_nodes"),
                     Map.of("text", "🔙 返回菜单", "callback_data", "menu_main")
             ));
 
             sendOrEditMessage(botToken, chatId, isEdit ? messageId : 0, sb.toString(), keyboard);
         } catch (Exception e) {
-            log.error("查询节点概况异常: ", e);
+            log.error("查询全量节点与转发状态异常: ", e);
+        }
+    }
+
+        private void registerBotMenuCommands(String botToken) {
+        try {
+            String url = "https://api.telegram.org/bot" + botToken + "/setMyCommands";
+            List<Map<String, String>> cmds = new ArrayList<>();
+            cmds.add(Map.of("command", "menu", "description", "打开控制台快捷交互菜单"));
+            cmds.add(Map.of("command", "flow", "description", "查看实时流量与消耗"));
+            cmds.add(Map.of("command", "nodes", "description", "查看所有节点与转发状态"));
+            cmds.add(Map.of("command", "users", "description", "查看用户统计数据"));
+            cmds.add(Map.of("command", "daily", "description", "立即生成并推送晚报"));
+
+            Map<String, Object> body = Map.of("commands", cmds);
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
+            HttpEntity<Map<String, Object>> request = new HttpEntity<>(body, headers);
+            restTemplate.postForEntity(url, request, String.class);
+            log.info("Telegram 官方快捷指令菜单注册成功！");
+        } catch (Exception e) {
+            log.warn("注册 Telegram 菜单失败: {}", e.getMessage());
         }
     }
 
@@ -429,7 +508,12 @@ public class TelegramBotPollingTask {
         try {
             var r = viteConfigService.getConfigByName(key);
             if (r != null && r.getData() != null) {
-                return r.getData().toString().trim();
+                Object data = r.getData();
+                if (data instanceof com.admin.entity.ViteConfig) {
+                    String val = ((com.admin.entity.ViteConfig) data).getValue();
+                    return val != null ? val.trim() : defaultVal;
+                }
+                return data.toString().trim();
             }
         } catch (Exception ignored) {}
         return defaultVal;
