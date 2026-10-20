@@ -1,3 +1,4 @@
+import NotificationPage from "@/pages/notification";
 import { Route, Routes, useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
 
@@ -210,6 +211,14 @@ function App() {
         element={
           <ProtectedRoute useSimpleLayout={true}>
             <LimitPage />
+          </ProtectedRoute>
+        } 
+      />
+      <Route 
+        path="/notification" 
+        element={
+          <ProtectedRoute>
+            <NotificationPage />
           </ProtectedRoute>
         } 
       />

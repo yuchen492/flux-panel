@@ -363,7 +363,7 @@ public class NodeServiceImpl extends ServiceImpl<NodeMapper, Node> implements No
         StringBuilder command = new StringBuilder();
         
         // 第一部分：下载安装脚本  
-        command.append("curl -L https://github.com/yuchen492/flux-panel/releases/download/v1.2.0/install.sh")
+        command.append("curl -L https://github.com/yuchen492/flux-panel/releases/download/v1.1.1/install.sh")
                .append(" -o ./install.sh && chmod +x ./install.sh && ");
         
         // 处理服务器地址，如果是IPv6需要添加方括号

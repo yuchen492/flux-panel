@@ -34,11 +34,11 @@ public class AlarmNotifyUtil {
                 String webhookEnabled = getConfigValue("alarm_webhook_enabled", "false");
                 String webhookUrl = getConfigValue("alarm_webhook_url", "");
 
-                String fullText = "【Flux-Panel 监控告警】\n" + title + "\n--------------------\n" + message;
+                String fullText = "<b>" + title + "</b>\n--------------------\n" + message;
 
                 // 1. 发送 Telegram 通知
                 if ("true".equalsIgnoreCase(tgEnabled) && !tgToken.isEmpty() && !tgChatId.isEmpty()) {
-                    sendTelegramMessage(tgToken, tgChatId, fullText);
+                    sendDirectTelegram(tgToken, tgChatId, title, message);
                 }
 
                 // 2. 发送 Webhook 通知
@@ -51,22 +51,26 @@ public class AlarmNotifyUtil {
         }).start();
     }
 
-    private void sendTelegramMessage(String token, String chatId, String text) {
+    public boolean sendDirectTelegram(String token, String chatId, String title, String message) {
         try {
             String url = "https://api.telegram.org/bot" + token + "/sendMessage";
+            String fullText = "<b>" + title + "</b>\n--------------------\n" + message;
+
             Map<String, String> body = new HashMap<>();
             body.put("chat_id", chatId);
-            body.put("text", text);
+            body.put("text", fullText);
             body.put("parse_mode", "HTML");
 
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_JSON);
             HttpEntity<Map<String, String>> request = new HttpEntity<>(body, headers);
 
-            restTemplate.postForEntity(url, request, String.class);
-            log.info("Telegram 告警发送成功: {}", chatId);
+            ResponseEntity<String> res = restTemplate.postForEntity(url, request, String.class);
+            log.info("Telegram 消息发送响应: {}", res.getStatusCode());
+            return res.getStatusCode().is2xxSuccessful();
         } catch (Exception e) {
-            log.warn("Telegram 告警推送失败: {}", e.getMessage());
+            log.warn("Telegram 消息推送失败: {}", e.getMessage());
+            return false;
         }
     }
 
