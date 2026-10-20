@@ -98,6 +98,45 @@ const CONFIG_ITEMS: ConfigItem[] = [
         description: '拖动滑块完成图片拼接' 
       }
     ]
+  },
+  {
+    key: 'alarm_tg_enabled',
+    label: '启用 Telegram 节点告警',
+    description: '当检测到节点离线或心跳异常断开时，即时推送到指定的 Telegram 对话',
+    type: 'switch'
+  },
+  {
+    key: 'alarm_tg_token',
+    label: 'Telegram Bot Token',
+    placeholder: '例如: 123456789:ABCdefGhIJKlmNoPQRsTUVwxyZ',
+    description: '用于发送告警消息的 Telegram 机器人 Token',
+    type: 'input',
+    dependsOn: 'alarm_tg_enabled',
+    dependsValue: 'true'
+  },
+  {
+    key: 'alarm_tg_chat_id',
+    label: 'Telegram Chat ID',
+    placeholder: '例如: 7876790495 或 -100xxxxxxxx',
+    description: '接收告警消息的用户 ID 或群组 ID',
+    type: 'input',
+    dependsOn: 'alarm_tg_enabled',
+    dependsValue: 'true'
+  },
+  {
+    key: 'alarm_webhook_enabled',
+    label: '启用 Webhook 自定义告警',
+    description: '支持推送 JSON 格式告警到企业微信、飞书、钉钉或自定义服务端',
+    type: 'switch'
+  },
+  {
+    key: 'alarm_webhook_url',
+    label: 'Webhook 推送地址',
+    placeholder: 'https://oapi.dingtalk.com/robot/send?access_token=...',
+    description: '接收 POST 告警事件的 Webhook 完整 URL',
+    type: 'input',
+    dependsOn: 'alarm_webhook_enabled',
+    dependsValue: 'true'
   }
 ];
 
@@ -105,7 +144,7 @@ const CONFIG_ITEMS: ConfigItem[] = [
 const getInitialConfigs = (): Record<string, string> => {
   if (typeof window === 'undefined') return {};
   
-  const configKeys = ['app_name', 'captcha_enabled', 'captcha_type', 'ip'];
+  const configKeys = ['app_name', 'captcha_enabled', 'captcha_type', 'ip', 'alarm_tg_enabled', 'alarm_tg_token', 'alarm_tg_chat_id', 'alarm_webhook_enabled', 'alarm_webhook_url'];
   const initialConfigs: Record<string, string> = {};
   
   try {

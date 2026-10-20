@@ -365,7 +365,39 @@ export default function AdminLayout({
             </Button>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
+            {/* 快速主题切换按钮 */}
+            <Button
+              isIconOnly
+              variant="light"
+              onPress={() => {
+                const current = localStorage.getItem('flux_color_mode') || 'system';
+                let next = 'dark';
+                if (current === 'dark') next = 'light';
+                else if (current === 'light') next = 'system';
+                else next = 'dark';
+                
+                localStorage.setItem('flux_color_mode', next);
+                if (next === 'dark') {
+                  document.documentElement.classList.add('dark');
+                  document.documentElement.style.colorScheme = 'dark';
+                } else if (next === 'light') {
+                  document.documentElement.classList.remove('dark');
+                  document.documentElement.style.colorScheme = 'light';
+                } else {
+                  const sysDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+                  document.documentElement.classList.toggle('dark', sysDark);
+                  document.documentElement.style.colorScheme = sysDark ? 'dark' : 'light';
+                }
+                toast.success(next === 'dark' ? '已切换至深色模式' : (next === 'light' ? '已切换至浅色模式' : '已恢复跟随系统主题'));
+              }}
+              title="切换主题 (浅色/深色/跟随系统)"
+              aria-label="Toggle Theme"
+            >
+              <svg className="w-5 h-5 text-gray-700 dark:text-gray-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+              </svg>
+            </Button>
             {/* 用户菜单 */}
              <Dropdown placement="bottom-end">
                <DropdownTrigger>

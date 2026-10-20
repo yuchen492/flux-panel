@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useTheme } from '@heroui/use-theme';
 
 interface ThemeProviderProps {
@@ -9,7 +9,6 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
   const { theme, setTheme } = useTheme();
 
   useEffect(() => {
-    // 确保主题与HTML class同步
     const updateThemeClass = (currentTheme: string) => {
       if (currentTheme === 'dark') {
         document.documentElement.classList.add('dark');
@@ -20,20 +19,29 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
       }
     };
 
-    // 始终跟随系统主题
-    const systemTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-    if (systemTheme !== theme) {
-      setTheme(systemTheme);
+    // 优先读取本地持久化主题模式 (light / dark / system)
+    const savedTheme = localStorage.getItem('flux_color_mode');
+    if (savedTheme === 'light' || savedTheme === 'dark') {
+      if (savedTheme !== theme) {
+        setTheme(savedTheme);
+      }
+      updateThemeClass(savedTheme);
+    } else {
+      const systemTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+      if (systemTheme !== theme) {
+        setTheme(systemTheme);
+      }
+      updateThemeClass(systemTheme);
     }
 
-    // 监听主题变化
-    updateThemeClass(theme);
-
-    // 监听系统主题变化
     const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
     const handleThemeChange = (e: MediaQueryListEvent) => {
-      const newTheme = e.matches ? 'dark' : 'light';
-      setTheme(newTheme);
+      const mode = localStorage.getItem('flux_color_mode');
+      if (!mode || mode === 'system') {
+        const newTheme = e.matches ? 'dark' : 'light';
+        setTheme(newTheme);
+        updateThemeClass(newTheme);
+      }
     };
 
     mediaQuery.addEventListener('change', handleThemeChange);
@@ -41,4 +49,4 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
   }, [theme, setTheme]);
 
   return <>{children}</>;
-}; 
+};
